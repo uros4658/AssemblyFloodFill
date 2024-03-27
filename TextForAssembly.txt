@@ -1,0 +1,188 @@
+JMP main
+str:
+    DB "AABAABAAAAAAAABA"
+    DB "AAABBAAAAAAAABAA"
+    DB "AAAAAAABAAAAAABA"
+    DB "AAAAAAAAAAAAAAAB"
+    DB "AABAAAAABAAAABAA"
+    DB "AAAAAAABABAAAAAA"
+    DB "AAAAAAABBAAAAAAA"
+    DB "AAAAAAABBBAABAAA"
+    DB "AABBAAAABABAAAAA"
+    DB "BAAABAAAABAAABAA"
+    DB "AAAAABAAAAAABABB"
+    DB "AAAAAAAAAAAAABAA"
+    DB "AAAABBAAAABBBAAA"
+    DB "AAAAABAAAABAAAAA"
+    DB "AAAAAAAAAAAAAABA"
+    DB "AAAAAAAAAAAABBAA"
+	DB "0"
+
+block:
+  DB "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  DB "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"  
+    
+main:
+  MOV A, 1
+  MOV SP , 0x0FFF
+  OUT 7
+  JMP str_break_A
+  
+str_loop_start:
+  MOV C, str
+  MOV D, 0
+str_loop:
+  MOV A, D
+  OUT 8
+  MOVB AH, [C]
+  CMPB AH, '0'
+  JE flood_fill_start
+  CMPB AH, 'A'
+  JE letter_a
+  MOVB AL, 0
+  JMP skip_a
+  letter_a:
+  MOVB AL, 255
+  skip_a:
+  OUT 9
+  INC C
+  CMPB DL, 30
+  JNE iterator
+  MOVB DL, 0
+  ADDB DH, 1
+  JMP str_loop
+  iterator:
+  	ADD D, 2
+  	JMP str_loop
+
+str_break_A:
+  MOV C, block
+  MOV D, 0x8820
+  MOV B, 16
+
+tile_set_loop_A:
+  CMP B, 0
+  JE str_loop_start
+  MOV A, D
+  OUT 8
+  MOV A, [C]
+  OUT 9
+  DEC B
+  ADD C, 2
+  ADD D, 2
+  JMP tile_set_loop_A
+  
+flood_fill_start:
+    MOV C, str ; pocetna lokacija
+    MOV D, 0 ; u grafici lokacija
+    JMP flood_fill
+    
+flood_fill:
+	JMP paint_over
+flood_fill_under_paint:
+    CMP B, 0
+    JE flood_fill_xplus
+    CMP B, 1 
+    JE flood_fill_xmin
+    CMP B, 2
+    JE flood_fill_ymin
+    CMP B, 3
+    JE flood_fill_yplus
+    CMP B, 4
+    JE no_options
+    
+flood_fill_xplus:
+	CMPB DH, 15
+    JE hit_edge
+    ADDB DH, 1
+    ADD C, 16
+    MOVB AH, [C] ; karakter
+    CMPB AH, 'B'
+    JE flood_fill_xplus_block
+    JMP paint_over
+    
+flood_fill_xplus_block:
+	SUB C, 16
+    SUBB DH, 1
+    ADD B, 1
+    MOVB AH, [C]
+    CMPB AH, 'B'
+    JE flood_fill_under_paint
+    JMP flood_fill
+    
+flood_fill_xmin:
+	CMPB DH, 0
+    JE hit_edge
+    SUBB DH, 1
+    SUB C, 16
+    MOVB AH, [C] ; karakter
+    CMPB AH, 'B'
+    JE flood_fill_xmin_block
+    JMP paint_over
+        
+flood_fill_xmin_block:
+	ADDB DH, 1
+    ADD C, 16
+    ADD B, 1
+    JMP flood_fill
+
+flood_fill_ymin:
+	CMPB DL, 0
+    JE hit_edge
+    SUBB DL, 2
+    SUB C, 1
+    MOVB AH, [C] ; karakter
+    CMPB AH, 'B'
+    JE flood_fill_ymin_block
+    JMP paint_over
+    
+flood_fill_ymin_block:
+	ADD C, 1
+    ADDB DL, 2
+    
+flood_fill_yplus:
+	CMPB DL, 30
+    JE hit_edge
+    ADDB DL, 2
+    ADD C, 1
+    MOVB AH, [C] ; karakter
+    CMPB AH, 'B'
+    JE flood_fill_yplus_block
+    JMP paint_over
+    
+flood_fill_yplus_block:
+	SUB C, 1
+    SUBB DL, 2
+    ADD B, 1
+    JMP flood_fill
+    ADD B, 1
+    JMP flood_fill
+    
+hit_edge:
+	ADD B, 1
+    JMP flood_fill
+    
+paint_over:   
+	MOV A, D
+  	OUT 8
+    MOVB AH, [C]
+    CMPB AH, 'B'
+    JE flood_fill_under_paint
+    PUSH D
+    PUSH C
+    MOV B, 0
+    MOVB AL, 224
+    OUT 9
+    MOVB AH, 'B'
+    MOVB [C], AH
+    JMP flood_fill_under_paint
+    
+no_options:
+	POP C
+    CMP C, 0
+    JE done
+    POP D
+    MOV B, 0
+    JMP flood_fill_under_paint
+done:
+	HLT
